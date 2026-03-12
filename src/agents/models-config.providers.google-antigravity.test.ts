@@ -97,3 +97,42 @@ describe("google-antigravity provider normalization", () => {
     expect(normalized).toBe(providers);
   });
 });
+
+describe("google-generative-ai provider normalization", () => {
+  it("normalizes gemini preview ids for custom google-generative-ai providers", () => {
+    const agentDir = mkdtempSync(join(tmpdir(), "openclaw-test-"));
+    const providers = {
+      "google-paid": {
+        ...buildProvider(["gemini-3-pro", "gemini-3.1-flash", "gemini-3.1-flash-lite"]),
+        api: "google-generative-ai",
+      },
+      openai: buildProvider(["gpt-5"]),
+    };
+
+    const normalized = normalizeProviders({ providers, agentDir });
+
+    expect(normalized?.["google-paid"]?.models.map((model) => model.id)).toEqual([
+      "gemini-3-pro-preview",
+      "gemini-3-flash-preview",
+      "gemini-3.1-flash-lite-preview",
+    ]);
+    expect(normalized?.openai).toBe(providers.openai);
+  });
+
+  it("normalizes google-generative-ai baseUrl to v1beta for custom providers", () => {
+    const agentDir = mkdtempSync(join(tmpdir(), "openclaw-test-"));
+    const providers = {
+      "google-paid": {
+        ...buildProvider(["gemini-3-pro-preview"]),
+        api: "google-generative-ai",
+        baseUrl: "https://generativelanguage.googleapis.com",
+      },
+    };
+
+    const normalized = normalizeProviders({ providers, agentDir });
+
+    expect(normalized?.["google-paid"]?.baseUrl).toBe(
+      "https://generativelanguage.googleapis.com/v1beta",
+    );
+  });
+});

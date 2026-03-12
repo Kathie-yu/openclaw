@@ -36,6 +36,11 @@ const GEMINI_3_1_FLASH_PREFIX = "gemini-3.1-flash";
 const GEMINI_3_1_PRO_TEMPLATE_IDS = ["gemini-3-pro-preview"] as const;
 const GEMINI_3_1_FLASH_TEMPLATE_IDS = ["gemini-3-flash-preview"] as const;
 
+function isGoogleProviderVariant(provider: string): boolean {
+  const normalizedProvider = normalizeProviderId(provider);
+  return normalizedProvider === "google" || normalizedProvider.startsWith("google-");
+}
+
 function resolveOpenAIGpt54ForwardCompatModel(
   provider: string,
   modelId: string,
@@ -259,7 +264,7 @@ function resolveGoogle31ForwardCompatModel(
   modelRegistry: ModelRegistry,
 ): Model<Api> | undefined {
   const normalizedProvider = normalizeProviderId(provider);
-  if (normalizedProvider !== "google" && normalizedProvider !== "google-gemini-cli") {
+  if (!isGoogleProviderVariant(normalizedProvider)) {
     return undefined;
   }
   const trimmed = modelId.trim();

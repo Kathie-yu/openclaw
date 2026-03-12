@@ -5,7 +5,7 @@ vi.mock("../pi-model-discovery.js", () => ({
   discoverModels: vi.fn(() => ({ find: vi.fn(() => null) })),
 }));
 
-import { buildInlineProviderModels, resolveModel } from "./model.js";
+import { buildInlineProviderModels, resolveModel, resolveModelWithRegistry } from "./model.js";
 import {
   buildOpenAICodexForwardCompatExpectation,
   GOOGLE_GEMINI_CLI_FLASH_TEMPLATE_MODEL,
@@ -151,9 +151,103 @@ describe("pi embedded model e2e smoke", () => {
     });
   });
 
+  it("builds a custom google provider forward-compat fallback for gemini-3.1-pro-preview", () => {
+    mockDiscoveredModel({
+      provider: "google-paid",
+      modelId: "gemini-3-pro-preview",
+      templateModel: {
+        ...GOOGLE_GEMINI_CLI_PRO_TEMPLATE_MODEL,
+        provider: "google-paid",
+        api: "google-generative-ai",
+        baseUrl: "https://generativelanguage.googleapis.com",
+      },
+    });
+
+    const result = resolveModel("google-paid", "gemini-3.1-pro-preview", "/tmp/agent");
+    expect(result.error).toBeUndefined();
+    expect(result.model).toMatchObject({
+      provider: "google-paid",
+      api: "google-generative-ai",
+      baseUrl: "https://generativelanguage.googleapis.com",
+      id: "gemini-3.1-pro-preview",
+      name: "gemini-3.1-pro-preview",
+      reasoning: true,
+    });
+  });
+
+  it("builds a custom google provider forward-compat fallback for gemini-3.1-flash-lite-preview", () => {
+    mockDiscoveredModel({
+      provider: "google-paid",
+      modelId: "gemini-3-flash-preview",
+      templateModel: {
+        ...GOOGLE_GEMINI_CLI_FLASH_TEMPLATE_MODEL,
+        provider: "google-paid",
+        api: "google-generative-ai",
+        baseUrl: "https://generativelanguage.googleapis.com",
+      },
+    });
+
+    const result = resolveModel("google-paid", "gemini-3.1-flash-lite-preview", "/tmp/agent");
+    expect(result.error).toBeUndefined();
+    expect(result.model).toMatchObject({
+      provider: "google-paid",
+      api: "google-generative-ai",
+      baseUrl: "https://generativelanguage.googleapis.com",
+      id: "gemini-3.1-flash-lite-preview",
+      name: "gemini-3.1-flash-lite-preview",
+      reasoning: true,
+    });
+  });
+
   it("keeps unknown-model errors for unrecognized google-gemini-cli model IDs", () => {
     const result = resolveModel("google-gemini-cli", "gemini-4-unknown", "/tmp/agent");
     expect(result.model).toBeUndefined();
     expect(result.error).toBe("Unknown model: google-gemini-cli/gemini-4-unknown");
+  });
+});
+
+it("normalizes google-generative-ai configured baseUrl to /v1beta during model resolution", () => {
+  mockDiscoveredModel({
+    provider: "google-paid",
+    modelId: "gemini-3.1-pro-preview",
+    templateModel: {
+      ...GOOGLE_GEMINI_CLI_PRO_TEMPLATE_MODEL,
+      provider: "google-paid",
+      api: "google-generative-ai",
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    },
+  });
+
+  const result = resolveModelWithRegistry({
+    provider: "google-paid",
+    modelId: "gemini-3.1-pro-preview",
+    modelRegistry: {
+      find: () => ({
+        ...GOOGLE_GEMINI_CLI_PRO_TEMPLATE_MODEL,
+        provider: "google-paid",
+        api: "google-generative-ai",
+        baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+        id: "gemini-3.1-pro-preview",
+        name: "gemini-3.1-pro-preview",
+      }),
+    } as never,
+    cfg: {
+      models: {
+        providers: {
+          "google-paid": {
+            api: "google-generative-ai",
+            baseUrl: "https://generativelanguage.googleapis.com",
+            models: [],
+          },
+        },
+      },
+    } as never,
+  });
+
+  expect(result).toMatchObject({
+    provider: "google-paid",
+    api: "google-generative-ai",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    id: "gemini-3.1-pro-preview",
   });
 });

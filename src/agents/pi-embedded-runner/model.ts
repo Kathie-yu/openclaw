@@ -23,6 +23,17 @@ type InlineProviderConfig = {
   headers?: unknown;
 };
 
+function normalizeGoogleGenerativeAiBaseUrl(baseUrl: string | undefined): string | undefined {
+  const trimmed = baseUrl?.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+  if (!/^https:\/\/generativelanguage\.googleapis\.com(?:\/)?(?:v1beta)?\/?$/i.test(trimmed)) {
+    return trimmed;
+  }
+  return trimmed.replace(/\/+$/, "").replace(/\/v1beta$/i, "") + "/v1beta";
+}
+
 function sanitizeModelHeaders(
   headers: unknown,
   opts?: { stripSecretRefMarkers?: boolean },
@@ -99,10 +110,17 @@ function applyConfiguredProviderOverrides(params: {
       ? resolvedInput.filter((item) => item === "text" || item === "image")
       : (["text"] as Array<"text" | "image">);
 
+  const resolvedApi = configuredModel?.api ?? providerConfig.api ?? discoveredModel.api;
+  const resolvedBaseUrlRaw = providerConfig.baseUrl ?? discoveredModel.baseUrl;
+  const resolvedBaseUrl =
+    resolvedApi === "google-generative-ai"
+      ? normalizeGoogleGenerativeAiBaseUrl(resolvedBaseUrlRaw)
+      : resolvedBaseUrlRaw;
+
   return {
     ...discoveredModel,
-    api: configuredModel?.api ?? providerConfig.api ?? discoveredModel.api,
-    baseUrl: providerConfig.baseUrl ?? discoveredModel.baseUrl,
+    api: resolvedApi,
+    baseUrl: resolvedBaseUrl,
     reasoning: configuredModel?.reasoning ?? discoveredModel.reasoning,
     input: normalizedInput,
     cost: configuredModel?.cost ?? discoveredModel.cost,
@@ -233,7 +251,10 @@ export function resolveModelWithRegistry(params: {
         name: modelId,
         api: providerConfig?.api ?? "openai-responses",
         provider,
-        baseUrl: providerConfig?.baseUrl,
+        baseUrl:
+          (providerConfig?.api ?? "openai-responses") === "google-generative-ai"
+            ? normalizeGoogleGenerativeAiBaseUrl(providerConfig?.baseUrl)
+            : providerConfig?.baseUrl,
         reasoning: configuredModel?.reasoning ?? false,
         input: ["text"],
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
